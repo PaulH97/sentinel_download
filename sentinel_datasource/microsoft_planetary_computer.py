@@ -39,7 +39,7 @@ class PlanetaryComputer():
 
     def download_all_assets(self, items, output_dir=""):
         output_dir = create_output_dir(output_dir)
-        downloaded_files = []
+        print("Output directory: ", output_dir)
         for item in items:
             print("Start downloading assets for item: ", item.id)
             for asset_key, asset in item.assets.items():
@@ -52,15 +52,14 @@ class PlanetaryComputer():
                 try:
                     file_url = asset.href
                     request.urlretrieve(file_url, output_file_path)
-                    downloaded_files.append(output_file_path)
                     print(f"Downloaded asset: {asset_key}")
                 except Exception as e:
                     print(f"Failed to download asset {asset_key}. Error: {e}")
-        return downloaded_files
+        return output_dir
     
     def download_specific_assets(self, items, custom_assets, output_dir=""):
         output_dir = create_output_dir(output_dir)
-        downloaded_files = []
+        print("Output directory: ", output_dir)
         for item in items:
             print("Start downloading assets for item: ", item.id)
             for asset_key, asset in item.assets.items():
@@ -74,8 +73,7 @@ class PlanetaryComputer():
                     try:
                         file_url = asset.href
                         request.urlretrieve(file_url, output_file_path)
-                        downloaded_files.append(output_file_path)
                         print(f"Downloaded asset: {asset_key}")
                     except Exception as e:
                         print(f"Failed to download asset {asset_key}. Error: {e}")
-        return downloaded_files
+        return output_dir
