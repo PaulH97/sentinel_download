@@ -1,9 +1,8 @@
 import pystac_client
 import planetary_computer 
 from datetime import datetime, timedelta
-from sentinel_datasource.utils import get_transformed_bbox
+from sentinel_datasource.utils import get_transformed_bbox, create_output_dir
 from urllib import request
-from pathlib import Path
 from mimetypes import guess_extension
 
 class PlanetaryComputer():
@@ -38,28 +37,45 @@ class PlanetaryComputer():
         print(f"Returned {len(results.item_collection())} items.")
         return results      
 
-    def download_all_assets(search_result, output_dir=""):
-        if not output_dir:
-            Path().cwd
-        else:
-            Path(output_dir).mkdir(parents=True, exist_ok=True)
-        
+    def download_all_assets(self, items, output_dir=""):
+        output_dir = create_output_dir(output_dir)
         downloaded_files = []
-
-        for item in search_result.item_collection_as_dict()['features']:
-            for asset_key, asset in item['assets'].items():
-                if 'href' in asset:
-                    file_url = asset['href']
-                    file_extension = guess_extension(asset.get('type', ''))
-                    file_name = f"{item['id']}_{asset_key}{file_extension}"
+        for item in items:
+            print("Start downloading assets for item: ", item.id)
+            for asset_key, asset in item.assets.items():
+                mime_type = asset.to_dict()["type"]
+                # make sure that only one file extension is loaded
+                mime_type = mime_type.split(';')[0].strip() if ";" in mime_type else mime_type 
+                file_extension = guess_extension(mime_type) or ''
+                file_name = f"{item.id}_{asset_key}{file_extension}"
+                output_file_path = output_dir / file_name
+                try:
+                    file_url = asset.href
+                    request.urlretrieve(file_url, output_file_path)
+                    downloaded_files.append(output_file_path)
+                    print(f"Downloaded asset: {asset_key}")
+                except Exception as e:
+                    print(f"Failed to download asset {asset_key}. Error: {e}")
+        return downloaded_files
+    
+    def download_specific_assets(self, items, custom_assets, output_dir=""):
+        output_dir = create_output_dir(output_dir)
+        downloaded_files = []
+        for item in items:
+            print("Start downloading assets for item: ", item.id)
+            for asset_key, asset in item.assets.items():
+                if asset_key in custom_assets:
+                    mime_type = asset.to_dict()["type"]
+                    # make sure that only one file extension is loaded
+                    mime_type = mime_type.split(';')[0].strip() if ";" in mime_type else mime_type 
+                    file_extension = guess_extension(mime_type) or ''
+                    file_name = f"{item.id}_{asset_key}{file_extension}"
                     output_file_path = output_dir / file_name
                     try:
+                        file_url = asset.href
                         request.urlretrieve(file_url, output_file_path)
                         downloaded_files.append(output_file_path)
                         print(f"Downloaded asset: {asset_key}")
                     except Exception as e:
                         print(f"Failed to download asset {asset_key}. Error: {e}")
-
         return downloaded_files
-
-
