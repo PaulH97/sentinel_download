@@ -55,18 +55,21 @@ class CDSE():
     def search_openSearch(self):
         pass
 
-    def download_via_zipper(self, items, output_dir=""):
+    def download(self, items, output_dir=""):
         output_dir = create_output_dir(output_dir)
         access_token = get_cdse_access_token(self.credentials)
         headers = {"Authorization": f"Bearer {access_token}"}
 
         for item in items:
+            item_name = item["Name"].split(".")[0]
+            item_folder = os.path.join(output_dir, item_name)
+            os.makedirs(item_folder, exist_ok=True)
             url = os.path.join(self.zipper_url, f"Products({item['Id']})/$value")
             with requests.Session() as session:
                 print(f"Starting download of {item['Name']}")
                 session.headers.update(headers)
                 response = session.get(url, headers=headers, stream=True)
-                output_file_path = os.path.join(output_dir, item["Name"].split(".")[0] + ".zip")
+                output_file_path = os.path.join(item_folder, item["Name"].split(".")[0] + ".zip")
                 with open(output_file_path, "wb") as file:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
@@ -74,7 +77,7 @@ class CDSE():
                 print("\nDownloaded file: ", output_file_path)
         return output_dir
 
-    def download_via_aws(self, items, output_dir=""):
+    def aws_download(self, items, output_dir=""):
         output_dir = create_output_dir(output_dir)
         s3 = boto3.client(
                 's3',
