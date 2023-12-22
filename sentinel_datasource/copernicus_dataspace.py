@@ -10,7 +10,7 @@ class CDSE():
         self.base_url = "https://catalogue.dataspace.copernicus.eu/odata/v1"
         self.zipper_url = "https://zipper.dataspace.copernicus.eu/odata/v1"
         self.base_s3url = "https://eodata.dataspace.copernicus.eu"
-        self.collections_with_products = {'SENTINEL-1':['SLC', 'GRD', 'RTC'], 'SENTINEL-2':[]}
+        self.collections_with_products = {'SENTINEL-1':['SLC', 'GRD', 'RTC'], 'SENTINEL-2':['L1C', 'L2A']}
         self.credentials = {}
         self.aws_keys = {}
 
