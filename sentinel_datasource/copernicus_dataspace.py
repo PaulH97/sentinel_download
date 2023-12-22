@@ -1,12 +1,32 @@
 import requests
+import os
+from sentinel_datasource.utils import * 
+import json
+import boto3
 from pathlib import Path
-from sentinel_datasource.utils import get_transformed_bbox_as_polygon, create_output_dir
 
 class CDSE():
-    def __init__(self):
+    def __init__(self, credentials_jsonpath="", aws_keys_jsonpath=""):
         self.base_url = "https://catalogue.dataspace.copernicus.eu/odata/v1"
         self.zipper_url = "https://zipper.dataspace.copernicus.eu/odata/v1"
+        self.base_s3url = "https://eodata.dataspace.copernicus.eu"
         self.collections_with_products = {'SENTINEL-1':['SLC', 'GRD', 'RTC'], 'SENTINEL-2':[]}
+        self.credentials = {}
+        self.aws_keys = {}
+
+        if credentials_jsonpath and os.path.exists(credentials_jsonpath):
+            self.set_credentials(credentials_jsonpath)
+
+        if aws_keys_jsonpath and os.path.exists(aws_keys_jsonpath):
+            self.set_aws_keys(aws_keys_jsonpath)
+
+    def set_aws_keys(self, aws_keys_jsonpath):
+        with open(aws_keys_jsonpath, 'r') as file:
+            self.aws_keys = json.load(file)
+
+    def set_credentials(self, credentials_jsonpath):
+        with open(credentials_jsonpath, 'r') as file:
+            self.credentials = json.load(file)
 
     def search_odata(self, search_parameters):
         updated_search_parameters = {}
@@ -35,39 +55,51 @@ class CDSE():
     def search_openSearch(self):
         pass
 
-    def download(self, items, output_dir=""):
+    def download_via_zipper(self, items, output_dir=""):
         output_dir = create_output_dir(output_dir)
-        # for item in items:
-        #     print("Start downloading assets for item: ", item.id)
-        #     for asset_key, asset in item.assets.items():
-        #         mime_type = asset.to_dict()["type"]
-        #         # make sure that only one file extension is loaded
-        #         mime_type = mime_type.split(';')[0].strip() if ";" in mime_type else mime_type 
-            
-        #         file_name = f"{item.id}_{asset_key}{file_extension}"
-        #         output_file_path = output_dir / file_name
-        #         try:
-        #             file_url = asset.href
-        #             request.urlretrieve(file_url, output_file_path)
-        #             print(f"Downloaded asset: {asset_key}")
-        #         except Exception as e:
-        #             print(f"Failed to download asset {asset_key}. Error: {e}")
-        return output_dir
-
-
-
-
-
-        url = self.zipper_url + "Products({product_id})/$value"
-
+        access_token = get_cdse_access_token(self.credentials)
         headers = {"Authorization": f"Bearer {access_token}"}
 
-        session = requests.Session()
-        session.headers.update(headers)
-        response = session.get(url, headers=headers, stream=True)
+        for item in items:
+            url = os.path.join(self.zipper_url, f"Products({item['Id']})/$value")
+            with requests.Session() as session:
+                print(f"Starting download of {item['Name']}")
+                session.headers.update(headers)
+                response = session.get(url, headers=headers, stream=True)
+                output_file_path = os.path.join(output_dir, item["Name"].split(".")[0] + ".zip")
+                with open(output_file_path, "wb") as file:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            file.write(chunk)
+                print("\nDownloaded file: ", output_file_path)
+        return output_dir
 
-        with open("product.zip", "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    file.write(chunk)
+    def download_via_aws(self, items, output_dir=""):
+        output_dir = create_output_dir(output_dir)
+        s3 = boto3.client(
+                's3',
+                aws_access_key_id=self.aws_keys["access_key"],
+                aws_secret_access_key=self.aws_keys["secret_key"], 
+                endpoint_url=self.base_s3url
+                )
+        for item in items:
+            item_name = item["Name"].split(".")[0]
+            item_folder = os.path.join(output_dir, item_name)
+            os.makedirs(item_folder, exist_ok=True)
+            print(f"Starting download of data via AWS-S3 in folder: ", item_folder)
+            s3_path_parts = item["S3Path"].split(os.sep)
+            bucket_name = s3_path_parts[1]
+            prefix = os.path.join(*s3_path_parts[2:])
 
+            paginator = s3.get_paginator('list_objects_v2')
+            page_iterator = paginator.paginate(Bucket=bucket_name, Prefix=str(prefix))
+
+            for page in page_iterator:
+                for obj in page.get("Contents", []):
+                    obj_key = obj["Key"]
+                    output_path = os.path.join(item_folder, obj_key.split('/')[-1])
+                    if not os.path.exists(output_path):
+                        s3.download_file(bucket_name, obj_key, str(output_path))
+                        print(f"Downloaded {obj_key} to {output_path}")
+                    else:
+                        print(f"File already existing! Skipped download of {obj_key}")
