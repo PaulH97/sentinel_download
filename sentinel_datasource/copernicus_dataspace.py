@@ -1,6 +1,6 @@
 import requests
 import os
-from sentinel_datasource.utils import * 
+from .utils import * 
 import json
 import boto3
 from pathlib import Path

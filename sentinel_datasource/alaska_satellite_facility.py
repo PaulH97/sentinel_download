@@ -1,7 +1,7 @@
 import asf_search as asf
 import hyp3_sdk as sdk
 from datetime import datetime, timedelta
-from sentinel_datasource.utils import get_transformed_bbox_as_polygon
+from .utils import get_transformed_bbox_as_polygon
 import os
 import contextily as ctx
 import geopandas as gpd

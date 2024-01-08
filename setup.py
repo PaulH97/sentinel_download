@@ -21,6 +21,6 @@ setup(
     author_email="paul.hoen@outlook.de",
     description="A package to handle download sentinel images from different APIs.",
     license="MIT",
-    keywords="satellite datacube",
+    keywords="sentinel download",
     url="https://github.com/PaulH97/sentinel_download.git",
 )

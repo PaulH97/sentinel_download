@@ -1,7 +1,7 @@
 import pystac_client
 import planetary_computer 
 from datetime import datetime, timedelta
-from sentinel_datasource.utils import get_transformed_bbox, create_output_dir
+from .utils import get_transformed_bbox, create_output_dir
 from urllib import request
 from mimetypes import guess_extension
 
