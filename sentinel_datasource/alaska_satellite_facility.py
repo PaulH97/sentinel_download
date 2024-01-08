@@ -3,6 +3,9 @@ import hyp3_sdk as sdk
 from datetime import datetime, timedelta
 from sentinel_datasource.utils import get_transformed_bbox_as_polygon
 import os
+import contextily as ctx
+import geopandas as gpd
+import matplotlib.pyplot as plt
 
 class ASF():
     def __init__(self, ):
@@ -33,6 +36,31 @@ class ASF():
         results = asf.geo_search(**updated_search_parameters)
         print(f'{len(results)} results found.')
         return results
+    
+    def plot_results(self, results, epsg_code=4326):
+        import pdb 
+        pdb.set_trace()
+
+        fig, ax = plt.subplots()
+
+        products_gdf = gpd.GeoDataFrame(products_df, geometry="geometry")
+        bbox_epsg4326 = get_bbox_as_polygon(self.transform_bbox(epsg_code))
+        raster_bounds = gpd.GeoDataFrame(geometry=[bbox_epsg4326], crs=f"EPSG:{epsg_code}")
+        raster_bounds.boundary.plot(ax=ax, color='red')  
+        products_gdf.boundary.plot(ax=ax, color='blue')
+
+        # Plotting names at centroids for cdse_products_gdf
+        for idx, row in products_gdf.iterrows():
+            centroid = row['geometry'].centroid
+            ax.text(centroid.x, centroid.y, s=row['id'].split("_")[0], horizontalalignment='center')
+
+        ctx.add_basemap(ax, crs=f"EPSG:{epsg_code}")
+        
+        ax.set_title("Boundaries Overlay")
+        ax.set_xlabel("Longitude")
+        ax.set_ylabel("Latitude")
+        #plt.savefig(output_path)
+        plt.plot()
 
     def start_rtc_jobs(self, search_results, rtc_specifications=None, job_name="rtc_jobs"):
         granule_ids = [result.properties["sceneName"] for result in search_results]
