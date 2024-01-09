@@ -50,3 +50,4 @@ def get_cdse_access_token(credentials):
     except Exception as e:
         raise Exception(f"Access token creation failed. Reponse from the server was: {r.json()}")
     return r.json()["access_token"]
+
