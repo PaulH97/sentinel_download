@@ -130,6 +130,9 @@ class ASF():
         
         return insar_jobs 
 
+    def get_jobs(self, job_name, status_code):
+        return self.session.find_jobs(name=job_name, status_code=status_code)
+
     def list_jobs(self, job_name):
         print(self.session.find_jobs(name=job_name))
 
