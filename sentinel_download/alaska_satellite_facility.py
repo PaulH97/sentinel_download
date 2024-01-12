@@ -72,12 +72,11 @@ class ASF():
     def plot_results(self, shapefile, epsg_code=4326, save=False):
         data = []
         for product in self.search_results:
-            product_id = product.properties["sceneName"]
-            product_geometry = shape(product.geometry)
-            product_date = product.properties["processingDate"]
-            data.append({'id': product_id, 'date': product_date, 'geometry': product_geometry})
+            properties = product.properties
+            properties["geometry"] = shape(product.geometry)
+            data.append(properties)
 
-        products_df = pd.DataFrame(data, columns=['id', 'date', 'geometry'])
+        products_df = pd.DataFrame(data)
         products_gdf = gpd.GeoDataFrame(products_df, geometry="geometry")
         bbox_epsg4326 = get_transformed_bbox_as_polygon(shapefile)
         raster_bounds = gpd.GeoDataFrame(geometry=[bbox_epsg4326], crs=f"EPSG:{epsg_code}")
@@ -89,7 +88,7 @@ class ASF():
         # Plotting names at centroids for cdse_products_gdf
         for idx, row in products_gdf.iterrows():
             centroid = row['geometry'].centroid
-            ax.text(centroid.x, centroid.y, s=row['id'].split("_")[0], horizontalalignment='center')
+            ax.text(centroid.x, centroid.y, s=row['frameNumber'], horizontalalignment='center')
 
         ctx.add_basemap(ax, crs=f"EPSG:{epsg_code}")
         
@@ -101,10 +100,15 @@ class ASF():
         else:
             plt.show()
 
+    def get_nearest_neighbors(self, granule, max_neighbors=None):
+        granule = asf.granule_search(granule)[0]
+        stack = reversed([item for item in granule.stack() if item.properties['temporalBaseline'] < 0]) # here we can optimize the search results -> select by frame number etc.
+        return asf.ASFSearchResults(stack)[:max_neighbors]
+
     def start_rtc_jobs(self, rtc_specifications=None, job_name="rtc_jobs"):
         granule_ids = [result.properties["sceneName"] for result in self.search_results]
         # Prepare default parameters and update with rtc_specifications if provided
-        default_params = {'name': job_name, 'resolution': 10}
+        default_params = {'name': job_name}
         if rtc_specifications:
             default_params.update(rtc_specifications)
         
@@ -116,28 +120,22 @@ class ASF():
         return rtc_jobs
         
     def start_insar_jobs(self, insar_specifications=None, job_name="insar_jobs"):
-        granule_ids = [result.properties["sceneName"] for result in search_results]
-        
         # Prepare default parameters and update with rtc_specifications if provided
         default_params = {'name': job_name}
         if insar_specifications:
             default_params.update(insar_specifications)
-
+        
         # Create a batch job for all granule IDs
         insar_jobs = sdk.Batch()
-        for granule_id in granule_ids:
-            insar_jobs += self.session.submit_insar_job(granule_id, **default_params)
-        
+        for result in self.search_results:
+            granule_id = result.properties["sceneName"]
+            neighbors = self.get_nearest_neighbors(granule_id, max_neighbors=2)
+            for secondary in neighbors:
+                insar_jobs += self.session.submit_insar_job(granule_id, secondary.properties['sceneName'], **default_params)
         return insar_jobs 
 
-    def get_jobs(self, job_name, status_code):
-        return self.session.find_jobs(name=job_name, status_code=status_code)
-
-    def list_jobs(self, job_name):
-        print(self.session.find_jobs(name=job_name))
-
-    def download_jobs(self, job_name, output_folder=None):
-        jobs = self.session.find_jobs(name=job_name)
-        output_folder = os.getcwd() if not output_folder else output_folder
-        downloaded_file_paths = jobs.download_files(location=output_folder)
-        return downloaded_file_paths
+    def get_jobs(self, job_name, status="all"):
+        if status == "all":
+            return self.session.find_jobs(name=job_name)
+        else:
+            return self.session.find_jobs(name=job_name, status_code=status)
