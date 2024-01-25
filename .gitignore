@@ -1,3 +1,5 @@
 **/__pycache__/
 /sentinel_download.egg-info
 /build
+*_credentials.json
+downloaded_files/*
